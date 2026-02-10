@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "GameZone",
+    "slug": "GameZone",
+    "version": "1.0.0",
+    "scheme": "gamezone",
+    "web": {
+      "bundler": "metro",
+      "output": "server" 
+    },
+    "android": {
+      "package": "com.bleaks.myproject",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-secure-store"
+    ]
+  }
+}
