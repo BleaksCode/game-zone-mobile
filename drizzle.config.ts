@@ -13,11 +13,14 @@
  *   npx drizzle-kit generate --config=drizzle-remote.config.ts -> Genera migraciones PG
  */
 
-import type { Config } from 'drizzle-kit';
-
-export default {
-  schema: './db/schema.ts',
-  out: './drizzle/migrations',
+import { defineConfig } from 'drizzle-kit';
+export default defineConfig({
+  schema: './src/db/schema.ts',
+  out: './drizzle',
   dialect: 'sqlite',
   driver: 'expo',
-} satisfies Config;
+  dbCredentials: {
+    url: 'file:./app-db.db',
+  },
+});
+
