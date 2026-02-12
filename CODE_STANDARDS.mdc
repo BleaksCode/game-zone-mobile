@@ -1,0 +1,673 @@
+# 📘 Estándares de Código -
+
+## 🎯 Objetivo
+
+Este documento establece las convenciones y mejores prácticas para el desarrollo del proyecto EcoStock, garantizando consistencia, calidad y mantenibilidad del código.
+
+---
+
+## 📁 1. Estructura de Archivos
+
+### Nomenclatura de Carpetas
+
+```
+✅ CORRECTO: kebab-case
+components/user-profile/
+features/cash-register/
+utils/date-formatters/
+
+❌ INCORRECTO:
+components/UserProfile/
+features/cash_register/
+utils/DateFormatters/
+```
+
+### Nomenclatura de Archivos
+
+#### Componentes React Native
+
+```typescript
+✅ CORRECTO: PascalCase.tsx
+Button.tsx
+UserProfileCard.tsx
+ProductListItem.tsx
+
+❌ INCORRECTO:
+button.tsx
+user-profile-card.tsx
+product_list_item.tsx
+```
+
+#### Utilidades, Services, Stores
+
+```typescript
+✅ CORRECTO: camelCase con sufijo descriptivo
+authService.ts
+productStore.ts
+dateFormatter.ts
+apiClient.ts
+
+❌ INCORRECTO:
+AuthService.ts
+product-store.ts
+date_formatter.ts
+```
+
+#### Types e Interfaces
+
+```typescript
+✅ CORRECTO: PascalCase con sufijo .types.ts
+User.types.ts
+Product.types.ts
+api.types.ts
+
+❌ INCORRECTO:
+user-types.ts
+product.interface.ts
+```
+
+---
+
+## 🏗️ 2. Estructura de Componentes
+
+### Template Estándar
+
+```typescript
+import { View, Text, Pressable } from 'react-native';
+import { useColorScheme } from 'nativewind';
+import type { ComponentProps } from './Component.types';
+
+/**
+ * Descripción del componente
+ *
+ * @example
+ * <Component prop1="value" onPress={handlePress} />
+ */
+export function Component({ prop1, prop2, onPress }: ComponentProps) {
+  const { colorScheme } = useColorScheme();
+
+  // Handlers
+  const handleAction = () => {
+    // Lógica aquí
+  };
+
+  // Render helpers
+  const renderItem = () => {
+    return <View>...</View>;
+  };
+
+  return (
+    <View className="flex-1">
+      {/* JSX aquí */}
+    </View>
+  );
+}
+
+
+```
+
+### Orden de Elementos en un Componente
+
+```typescript
+1. Imports (agrupados)
+   - React/React Native
+   - Librerías externas
+   - Componentes propios
+   - Utils/Helpers
+   - Types
+   - Styles
+
+2. Types/Interfaces (si son específicos del componente)
+
+3. Constantes
+
+4. Componente principal
+   - Props destructuring
+   - Hooks (useState, useEffect, custom hooks)
+   - Handlers
+   - Render helpers
+   - Return JSX
+
+5. Componentes internos (si existen)
+
+6. Exports
+```
+
+---
+
+## 📝 3. Convenciones de Nomenclatura
+
+### Variables y Funciones
+
+```typescript
+✅ CORRECTO: camelCase descriptivo
+const productList = [];
+const isLoading = false;
+const hasError = true;
+const userCount = 10;
+
+function calculateTotal() {}
+function handleSubmit() {}
+function fetchUserData() {}
+
+❌ INCORRECTO:
+const ProductList = [];
+const loading = false; // Prefiere isLoading
+const error = true; // Prefiere hasError
+const num = 10; // No descriptivo
+
+function calc() {} // Abreviado
+function submit() {} // Sin contexto
+function get() {} // Demasiado genérico
+```
+
+### Booleanos
+
+```typescript
+✅ CORRECTO: Usa prefijos is, has, should, can
+const isVisible = true;
+const hasAccess = false;
+const shouldUpdate = true;
+const canEdit = false;
+
+❌ INCORRECTO:
+const visible = true;
+const access = false;
+const update = true;
+```
+
+### Constantes Globales
+
+```typescript
+✅ CORRECTO: UPPER_SNAKE_CASE
+const API_BASE_URL = 'https://api.example.com';
+const MAX_RETRY_ATTEMPTS = 3;
+const DEFAULT_PAGE_SIZE = 20;
+
+❌ INCORRECTO:
+const apiBaseUrl = 'https://api.example.com';
+const maxRetryAttempts = 3;
+```
+
+### Eventos y Handlers
+
+```typescript
+✅ CORRECTO: Prefijo handle/on
+// En el componente padre
+const handlePress = () => {};
+const handleSubmit = () => {};
+const handleInputChange = () => {};
+
+// En el componente hijo (prop)
+<Button onPress={handlePress} />
+<Input onChange={handleInputChange} />
+
+❌ INCORRECTO:
+const press = () => {};
+const submit = () => {};
+const clickHandler = () => {}; // Usa "Press" en móvil, no "Click"
+```
+
+---
+
+## 🎨 4. TypeScript
+
+### Interfaces vs Types
+
+```typescript
+✅ CORRECTO: Usa interfaces para objetos, types para unions/intersections
+
+// Interfaces para objetos y React props
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface ButtonProps {
+  title: string;
+  onPress: () => void;
+}
+
+// Types para unions, intersections, mapped types
+type Status = 'idle' | 'loading' | 'success' | 'error';
+type UserWithRole = User & { role: string };
+type Optional<T> = { [K in keyof T]?: T[K] };
+
+❌ INCORRECTO:
+type User = {  // Usa interface
+  id: string;
+}
+
+interface Status = 'idle' | 'loading'; // No válido
+```
+
+### Tipado Explícito
+
+```typescript
+✅ CORRECTO: Tipar parámetros y retornos complejos
+function calculateTotal(items: Product[]): number {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
+
+const fetchUser = async (id: string): Promise<User> => {
+  const response = await api.get(`/users/${id}`);
+  return response.data;
+};
+
+// Inferencia está OK para casos simples
+const count = 10; // number inferido
+const name = 'Juan'; // string inferido
+
+❌ INCORRECTO:
+function calculateTotal(items: any): any { // Evita any
+  return items.reduce((sum: any, item: any) => sum + item.price, 0);
+}
+```
+
+### Never Use `any`
+
+```typescript
+❌ EVITAR:
+const data: any = await fetchData();
+function handleEvent(event: any) {}
+
+✅ ALTERNATIVAS:
+const data: unknown = await fetchData(); // Para validar después
+const data = (await fetchData()) as User; // Si sabes el tipo
+
+function handleEvent(event: PressEvent) {} // Tipo específico
+function handleEvent<T>(event: T) {} // Genérico si es necesario
+```
+
+---
+
+## 🎯 5. React Native Específico
+
+### Estilos con NativeWind
+
+```typescript
+✅ CORRECTO: Usa className con NativeWind (Tailwind)
+<View className="flex-1 bg-white dark:bg-gray-900">
+  <Text className="text-lg font-bold text-primary">
+    Título
+  </Text>
+</View>
+
+// Para estilos dinámicos
+<View className={`flex-1 ${isActive ? 'bg-primary' : 'bg-gray-200'}`}>
+
+❌ EVITAR StyleSheet si usas NativeWind (excepto casos muy específicos)
+const styles = StyleSheet.create({ ... });
+```
+
+### Imports de React Native
+
+```typescript
+✅ CORRECTO: Importa solo lo necesario
+import { View, Text, Pressable, ScrollView } from 'react-native';
+
+❌ INCORRECTO: No importes todo
+import * as RN from 'react-native';
+```
+
+### TouchableOpacity vs Pressable
+
+```typescript
+✅ CORRECTO: Usa Pressable (más moderno)
+<Pressable
+  onPress={handlePress}
+  className="active:opacity-70">
+  <Text>Press me</Text>
+</Pressable>
+
+❌ DEPRECADO:
+<TouchableOpacity onPress={handlePress}>
+  <Text>Press me</Text>
+</TouchableOpacity>
+```
+
+---
+
+## 🔄 6. Async/Await y Promesas
+
+```typescript
+✅ CORRECTO:
+async function fetchData() {
+  try {
+    const response = await api.get('/data');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    throw error;
+  }
+}
+
+// Múltiples llamadas paralelas
+const [users, products] = await Promise.all([
+  fetchUsers(),
+  fetchProducts(),
+]);
+
+❌ INCORRECTO:
+function fetchData() {
+  return api.get('/data')
+    .then(response => response.data)
+    .catch(error => console.error(error));
+}
+```
+
+---
+
+## 🧪 7. Manejo de Errores
+
+```typescript
+✅ CORRECTO:
+try {
+  const result = await riskyOperation();
+  console.log('Success:', result);
+} catch (error) {
+  if (error instanceof ApiError) {
+    showToast(error.message);
+  } else {
+    console.error('Unexpected error:', error);
+    showToast('Algo salió mal');
+  }
+}
+
+// En servicios, lanza errores específicos
+throw new Error('Product not found');
+throw new ApiError('Unauthorized', 401);
+
+❌ INCORRECTO:
+try {
+  const result = await riskyOperation();
+} catch (error) {
+  // Silenciar errores
+}
+
+// No usar console.log para errores
+console.log(error); // Usa console.error
+```
+
+---
+
+## 🔐 8. Seguridad
+
+### Variables de Entorno
+
+```typescript
+✅ CORRECTO:
+// .env
+API_URL=https://api.ecostock.com
+EXPO_PUBLIC_API_URL=https://api.ecostock.com
+
+// Acceso
+import Constants from 'expo-constants';
+const API_URL = Constants.expoConfig?.extra?.apiUrl;
+
+❌ INCORRECTO: No hardcodear credenciales
+const API_KEY = 'sk_live_12345...'; // ¡NUNCA!
+```
+
+### Almacenamiento Seguro
+
+```typescript
+✅ CORRECTO:
+import * as SecureStore from 'expo-secure-store';
+
+await SecureStore.setItemAsync('token', authToken);
+const token = await SecureStore.getItemAsync('token');
+
+❌ INCORRECTO: No usar AsyncStorage para datos sensibles
+await AsyncStorage.setItem('token', authToken); // ¡NO!
+```
+
+---
+
+## 📦 9. Imports y Exports
+
+### Orden de Imports
+
+```typescript
+// 1. React y React Native
+import React, { useState, useEffect } from 'react';
+import { View, Text, Pressable } from 'react-native';
+
+// 2. Librerías externas
+import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
+
+// 3. Alias de proyecto (@/)
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
+
+// 4. Relativos
+import { ProductCard } from './ProductCard';
+import { calculateTotal } from '../utils/calculations';
+import type { ProductListProps } from './ProductList.types';
+
+// 5. Styles (si aplica)
+import { styles } from './ProductList.styles';
+```
+
+### Named Exports vs Default Export
+
+```typescript
+✅ CORRECTO: Named exports para componentes
+// Button.tsx
+export function Button({ title, onPress }: ButtonProps) {
+  return <Pressable onPress={onPress}>...</Pressable>;
+}
+
+// Import
+import { Button } from '@/components/ui/Button';
+
+✅ TAMBIÉN OK: Default export para páginas/screens (Expo Router lo prefiere)
+// app/(tabs)/index.tsx
+export default function DashboardScreen() {
+  return <View>...</View>;
+}
+
+❌ EVITAR: Mezclar ambos sin razón
+export function Button() {}
+export default Button; // Redundante
+```
+
+---
+
+## 🧩 10. Componentes y Props
+
+### Props Destructuring
+
+```typescript
+✅ CORRECTO:
+interface ButtonProps {
+  title: string;
+  variant?: 'primary' | 'secondary';
+  onPress: () => void;
+}
+
+export function Button({
+  title,
+  variant = 'primary',
+  onPress
+}: ButtonProps) {
+  return <Pressable onPress={onPress}>...</Pressable>;
+}
+
+❌ INCORRECTO:
+export function Button(props: ButtonProps) {
+  return <Pressable onPress={props.onPress}>...</Pressable>;
+}
+```
+
+### Children Props
+
+```typescript
+✅ CORRECTO:
+interface CardProps {
+  children: React.ReactNode;
+  title?: string;
+}
+
+export function Card({ children, title }: CardProps) {
+  return (
+    <View>
+      {title && <Text>{title}</Text>}
+      {children}
+    </View>
+  );
+}
+```
+
+---
+
+## 🪝 11. Custom Hooks
+
+```typescript
+✅ CORRECTO:
+// hooks/useProducts.ts
+export function useProducts() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  async function fetchProducts() {
+    setIsLoading(true);
+    try {
+      const data = await productService.getAll();
+      setProducts(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return { products, isLoading, refetch: fetchProducts };
+}
+
+// Uso
+const { products, isLoading } = useProducts();
+```
+
+---
+
+## 📋 12. Comentarios y Documentación
+
+### Comentarios Inline
+
+```typescript
+✅ CORRECTO: Comentarios para lógica compleja
+// Filtrar productos activos con stock disponible
+const availableProducts = products.filter(
+  p => p.isActive && p.stock > 0
+);
+
+// TODO: Implementar paginación en Sprint 4
+// FIXME: Este cálculo no considera descuentos
+
+❌ EVITAR: Comentarios obvios
+// Set loading to true
+setIsLoading(true);
+
+// Loop through products
+products.forEach(product => { ... });
+```
+
+---
+
+## 🚫 13. Anti-Patrones a Evitar
+
+```typescript
+❌ 1. Modificar state directamente
+products.push(newProduct); // ¡NO!
+setProducts(products);
+
+✅ Usa spread/inmutabilidad
+setProducts([...products, newProduct]);
+
+❌ 2. Demasiados useState
+const [name, setName] = useState('');
+const [email, setEmail] = useState('');
+const [phone, setPhone] = useState('');
+// ... 10 más
+
+✅ Agrupa en un objeto o usa useReducer
+const [form, setForm] = useState({
+  name: '',
+  email: '',
+  phone: '',
+});
+
+❌ 3. Lógica en el JSX
+<View>
+  {products.filter(p => p.active).map((p, i) => (
+    <Text key={i}>{p.name}</Text>
+  ))}
+</View>
+
+✅ Extrae a variables
+const activeProducts = products.filter(p => p.active);
+return (
+  <View>
+    {activeProducts.map((product) => (
+      <Text key={product.id}>{product.name}</Text>
+    ))}
+  </View>
+);
+
+❌ 4. Keys con índices
+{items.map((item, index) => <Item key={index} />)}
+
+✅ Usa IDs únicos
+{items.map((item) => <Item key={item.id} />)}
+```
+
+---
+
+## ✅ 14. Checklist Pre-Commit
+
+Antes de hacer commit, verifica:
+
+- [ ] ¿El código sigue las convenciones de nomenclatura?
+- [ ] ¿Hay console.logs olvidados? (excepto console.error)
+- [ ] ¿Los componentes tienen props bien tipadas?
+- [ ] ¿No hay `any` en el código?
+- [ ] ¿ESLint y Prettier están felices? (sin warnings)
+- [ ] ¿Los archivos nuevos siguen la estructura correcta?
+- [ ] ¿Los comentarios TODOs tienen asignación de Sprint?
+- [ ] ¿No hay código comentado sin razón?
+
+---
+
+---
+
+## 🎓 16. Recursos Adicionales
+
+- [React Native Docs](https://reactnative.dev/docs/getting-started)
+- [Expo Docs](https://docs.expo.dev/)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
+- [NativeWind Docs](https://www.nativewind.dev/)
+- [Expo Router Docs](https://docs.expo.dev/router/introduction/)
+
+---
+
+## 📞 Dudas
+
+Si tienes dudas sobre alguna convención:
+
+1. Revisa este documento
+2. Consulta con el Frontend Senior
+3. Si no está documentado, propón una nueva convención en el Daily
+
+---
+
+**Versión:** 1.0.0  
+**Última actualización:** Sprint 0  
+**Mantenido por:** Frontend Senior

@@ -1,46 +1,34 @@
 /**
- * db/client.ts
- * --------------
- * Clientes Drizzle ORM para SQLite (local) y PostgreSQL (Supabase remoto).
+ * src/db/client.ts
+ * ----------------
+ * Cliente Drizzle para SQLite local.
+ * SE USA EN EL MÓVIL (Componentes y Hooks).
  *
- * CORRECCIÓN APLICADA:
- * Se han eliminado las importaciones estáticas de 'expo-sqlite' y 'drizzle-orm/expo-sqlite'.
- * Ahora se usan `require` dinámicos dentro de funciones para evitar que el
- * entorno de servidor (API Routes) intente cargar módulos nativos de móvil.
+ * NOTA: La conexión remota (PostgreSQL) se ha movido a 'remote-client.ts'
+ * para evitar errores de bundling en Android.
  */
 
+import { drizzle } from 'drizzle-orm/expo-sqlite';
+import { openDatabaseSync } from 'expo-sqlite';
 import * as schema from './schema';
-import * as remoteSchema from './remote-schema';
 
-// ---------------------------------------------------------------------------
-// 1. SQLite Local (Cliente — React Native)
-// ---------------------------------------------------------------------------
-
-let _localDb: ReturnType<typeof import('drizzle-orm/expo-sqlite').drizzle> | null = null;
+let _localDb: ReturnType<typeof drizzle> | null = null;
 
 /**
  * Obtiene la instancia de la base de datos local (SQLite).
- * Úsala en tus componentes y hooks (ej. useQuery).
- * * @returns Instancia de Drizzle SQLite
+ * Úsala en tus componentes y hooks.
  */
 export function getLocalDb() {
   // Si ya existe la instancia, la devolvemos (Singleton)
   if (_localDb) return _localDb;
 
-  // Verificación de seguridad: Si estamos en el servidor, devolvemos null
-  // (Aunque idealmente este código nunca debería llamarse desde el servidor)
+  // Verificación de seguridad: Si estamos en el servidor (SSR/API), devolvemos null
   if (typeof window === 'undefined') {
     return null;
   }
 
   try {
-    // Importaciones dinámicas (solo se ejecutan en el móvil)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { openDatabaseSync } = require('expo-sqlite');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { drizzle } = require('drizzle-orm/expo-sqlite');
-
-    const expoDb = openDatabaseSync('tournament-manager.db', {
+    const expoDb = openDatabaseSync('app-db.db', {
       enableChangeListener: true,
     });
     
@@ -52,65 +40,16 @@ export function getLocalDb() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 2. PostgreSQL Remoto (Servidor — API Routes)
-// ---------------------------------------------------------------------------
-
-let _remoteDb: ReturnType<typeof import('drizzle-orm/postgres-js').drizzle> | null = null;
-
-/**
- * Crea y retorna la instancia de Drizzle ORM sobre PostgreSQL (Supabase).
- * Se usa EXCLUSIVAMENTE en las API Routes del servidor (app/api/...).
- */
-export function getRemoteDb() {
-  if (_remoteDb) return _remoteDb;
-
-  // Importaciones dinámicas para que solo corran en Node.js
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const postgres = require('postgres');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { drizzle } = require('drizzle-orm/postgres-js');
-
-  const connectionString = process.env.SUPABASE_DB_URL;
-  if (!connectionString) {
-    throw new Error(
-      'SUPABASE_DB_URL no está definida. Configura la variable de entorno.',
-    );
-  }
-
-  console.log("--- URL DETECTADA POR EL SISTEMA ---");
-  console.log(connectionString); 
-  console.log("------------------------------------");
-
-  const client = postgres(connectionString, {
-    max: 1,
-    idle_timeout: 20,
-    connect_timeout: 10,
-    prepare: false,      // Obligatorio para Supabase Pooler
-    ssl: 'require',
-  });
-
-  _remoteDb = drizzle(client, { schema: remoteSchema });
-  return _remoteDb;
-}
-
-// ---------------------------------------------------------------------------
-// 3. Inicialización del esquema local (Solo Móvil)
-// ---------------------------------------------------------------------------
-
 /**
  * Crea las tablas locales de SQLite si no existen.
- * Debe llamarse una vez al inicio de la app (en el layout raíz).
+ * Debe llamarse una vez al inicio de la app.
  */
 export async function initLocalDatabase(): Promise<void> {
   // Protección para no ejecutar en servidor
   if (typeof window === 'undefined') return;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { openDatabaseSync } = require('expo-sqlite');
-    
-    const expoDb = openDatabaseSync('tournament-manager.db');
+    const expoDb = openDatabaseSync('app-db.db');
 
     expoDb.execSync(`
       -- Better-Auth tables

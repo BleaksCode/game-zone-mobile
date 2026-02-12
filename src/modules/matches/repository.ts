@@ -13,7 +13,7 @@ import {
   type Match,
   type NewMatch,
   type BracketTypeValue,
-} from '@/db/schema';
+} from '@/src/db/schema';
 import * as Crypto from 'expo-crypto';
 
 export const MatchRepository = {
