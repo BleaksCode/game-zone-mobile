@@ -129,6 +129,7 @@ interface CachedSession {
 export function useOfflineAuth()  {
   const session = useSession();
   const { isOnline } = useConnectivity();
+  const remoteSessionEnabled = isOnline;
 
   // Estado local del usuario (puede venir de cache o del servidor)
   const [cachedUser, setCachedUser] = useState<CachedUser | null>(null);
@@ -138,8 +139,11 @@ export function useOfflineAuth()  {
   // Ref para saber si alguna vez estuvo autenticado en esta sesión
   const wasAuthenticatedRef = useRef(false);
 
-  // Usuario actual: del servidor si está online, del cache si está offline
-  const serverUser = session.data?.user as CachedUser | null;
+  // Usuario actual: del servidor solo cuando está online
+  const serverUser = remoteSessionEnabled ? (session.data?.user as CachedUser | null) : null;
+  const remoteSessionData = remoteSessionEnabled ? session.data : null;
+  const remoteSessionError = remoteSessionEnabled ? session.error : null;
+  const remoteSessionPending = remoteSessionEnabled ? session.isPending : false;
 
   /**
    * Determina el usuario efectivo basado en el estado de conexión:
@@ -149,8 +153,8 @@ export function useOfflineAuth()  {
    * - Si nunca estuvo autenticado, no tiene usuario
    */
   const effectiveUser = (() => {
-    // Si el servidor tiene datos válidos, priorizar
-    if (serverUser) {
+    // Si está online y el servidor tiene datos válidos, priorizar
+    if (remoteSessionEnabled && serverUser) {
       return serverUser;
     }
 
@@ -164,7 +168,7 @@ export function useOfflineAuth()  {
     }
 
     // Si está cargando la sesión inicial y tenemos cache, mostrar cache
-    if (session.isPending && cachedUser) {
+    if (remoteSessionPending && cachedUser) {
       return cachedUser;
     }
 
@@ -235,12 +239,17 @@ export function useOfflineAuth()  {
 
   // Detectar errores de sincronización cuando está offline
   useEffect(() => {
-    if (!isOnline && session.error) {
+    if (!isOnline) {
       setSyncError('No hay conexión a internet. Usando datos locales.');
-    } else if (isOnline) {
+      return;
+    }
+
+    if (remoteSessionError) {
+      setSyncError('Error al sincronizar sesión.');
+    } else {
       setSyncError(null);
     }
-  }, [isOnline, session.error]);
+  }, [isOnline, remoteSessionError]);
 
   // Refetch manual solo si hay conexión
   const refetchSession = useCallback(async () => {
@@ -277,12 +286,13 @@ export function useOfflineAuth()  {
 
     // Estado de conexión y sincronización
     isOnline,
-    isSynced: isOnline && !!serverUser,
+    remoteSessionEnabled,
+    isSynced: isOnline && !!serverUser && !remoteSessionError,
     syncError,
 
     // Datos del servidor (puede ser null si offline)
     serverUser,
-    serverSession: session.data,
+    serverSession: remoteSessionData,
 
     // Acciones
     refetchSession,
