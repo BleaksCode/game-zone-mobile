@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { authClient } from '@/src/lib/auth-client';
+import { authClient, signIn, useSession } from '@/src/lib/auth-client';
 import { eq } from 'drizzle-orm';
 import { useConnectivity } from '@/src/contexts/connectivity-context';
 
@@ -15,7 +15,8 @@ import { useConnectivity } from '@/src/contexts/connectivity-context';
 // Constantes
 // ---------------------------------------------------------------------------
 
-const CACHE_KEY = 'gamezone_user_session';
+const CACHED_USER_KEY = 'gamezone_cached_user';
+const CACHED_SESSION_KEY = 'gamezone_cached_session';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -26,326 +27,289 @@ export interface CachedUser {
   name: string;
   email: string;
   image?: string | null;
+  username?: string;
   emailVerified?: boolean;
 }
 
-interface UseOfflineAuthReturn {
-  user: CachedUser | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  isSyncing: boolean;
-  isOnline: boolean; 
-  error: string | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
-  refreshSession: () => Promise<void>;
+interface CachedSession {
+  user: CachedUser;
+  cachedAt: number;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers: SQLite & SecureStore
 // ---------------------------------------------------------------------------
 
-function getLocalDbSafe() {
-  try {
-    // Importamos del cliente que AHORA es solo local
-    // Asegúrate de que client.ts esté configurado con 'app-db.db'
-    const { getLocalDb } = require('@/src/db/client');
-    const db = getLocalDb();
-    if (!db) return null;
-    const schema = require('@/src/db/schema');
-    return { db, schema };
-  } catch {
-    return null;
-  }
-}
+// function getLocalDbSafe() {
+//   try {
+//     // Importamos del cliente que AHORA es solo local
+//     // Asegúrate de que client.ts esté configurado con 'app-db.db'
+//     const { getLocalDb } = require('@/src/db/client');
+//     const db = getLocalDb();
+//     if (!db) return null;
+//     const schema = require('@/src/db/schema');
+//     return { db, schema };
+//   } catch {
+//     return null;
+//   }
+// }
 
-async function ensureLocalTables() {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { initLocalDatabase } = require('@/src/db/client');
-    await initLocalDatabase();
-  } catch (e) {
-    console.warn('[useOfflineAuth] Error inicializando tablas locales:', e);
-  }
-}
+// async function ensureLocalTables() {
+//   try {
+//     // eslint-disable-next-line @typescript-eslint/no-require-imports
+//     const { initLocalDatabase } = require('@/src/db/client');
+//     await initLocalDatabase();
+//   } catch (e) {
+//     console.warn('[useOfflineAuth] Error inicializando tablas locales:', e);
+//   }
+// }
 
-async function upsertLocalUser(userData: CachedUser) {
-  const local = getLocalDbSafe();
-  if (!local) return;
-  const { db, schema } = local;
-  try {
-    const existing = await db.select().from(schema.users).where(eq(schema.users.id, userData.id)).limit(1);
-    if (existing.length > 0) {
-      await db.update(schema.users).set({
-        name: userData.name, email: userData.email, image: userData.image ?? null,
-        emailVerified: userData.emailVerified ?? false, updatedAt: new Date().toISOString(),
-      }).where(eq(schema.users.id, userData.id));
-    } else {
-      await db.insert(schema.users).values({
-        id: userData.id, name: userData.name, email: userData.email, image: userData.image ?? null,
-        emailVerified: userData.emailVerified ?? false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      });
-    }
-  } catch (e) { console.warn('[useOfflineAuth] Error upserting local user:', e); }
-}
+// async function upsertLocalUser(userData: CachedUser) {
+//   const local = getLocalDbSafe();
+//   if (!local) return;
+//   const { db, schema } = local;
+//   try {
+//     const existing = await db.select().from(schema.users).where(eq(schema.users.id, userData.id)).limit(1);
+//     if (existing.length > 0) {
+//       await db.update(schema.users).set({
+//         name: userData.name, email: userData.email, image: userData.image ?? null,
+//         emailVerified: userData.emailVerified ?? false, updatedAt: new Date().toISOString(),
+//       }).where(eq(schema.users.id, userData.id));
+//     } else {
+//       await db.insert(schema.users).values({
+//         id: userData.id, name: userData.name, email: userData.email, image: userData.image ?? null,
+//         emailVerified: userData.emailVerified ?? false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+//       });
+//     }
+//   } catch (e) { console.warn('[useOfflineAuth] Error upserting local user:', e); }
+// }
 
-async function getLocalUser(userId: string): Promise<CachedUser | null> {
-  const local = getLocalDbSafe();
-  if (!local) return null;
-  const { db, schema } = local;
-  try {
-    const rows = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
-    if (rows.length === 0) return null;
-    return { id: rows[0].id, name: rows[0].name, email: rows[0].email, image: rows[0].image, emailVerified: rows[0].emailVerified };
-  } catch { return null; }
-}
+// async function getLocalUser(userId: string): Promise<CachedUser | null> {
+//   const local = getLocalDbSafe();
+//   if (!local) return null;
+//   const { db, schema } = local;
+//   try {
+//     const rows = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+//     if (rows.length === 0) return null;
+//     return { id: rows[0].id, name: rows[0].name, email: rows[0].email, image: rows[0].image, emailVerified: rows[0].emailVerified };
+//   } catch { return null; }
+// }
 
-async function clearLocalSessions(userId: string) {
-  const local = getLocalDbSafe();
-  if (!local) return;
-  const { db, schema } = local;
-  try { await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId)); } 
-  catch (e) { console.warn('[useOfflineAuth] Error limpiando sesiones locales:', e); }
-}
+// async function clearLocalSessions(userId: string) {
+//   const local = getLocalDbSafe();
+//   if (!local) return;
+//   const { db, schema } = local;
+//   try { await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId)); } 
+//   catch (e) { console.warn('[useOfflineAuth] Error limpiando sesiones locales:', e); }
+// }
 
-async function getCachedUser(): Promise<CachedUser | null> {
-  try {
-    const raw = await SecureStore.getItemAsync(CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as CachedUser;
-  } catch { return null; }
-}
+// async function getCachedUser(): Promise<CachedUser | null> {
+//   try {
+//     const raw = await SecureStore.getItemAsync(CACHE_KEY);
+//     if (!raw) return null;
+//     return JSON.parse(raw) as CachedUser;
+//   } catch { return null; }
+// }
 
-async function setCachedUser(user: CachedUser): Promise<void> {
-  try { await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(user)); } 
-  catch (e) { console.warn('[useOfflineAuth] Error guardando cache:', e); }
-}
+// async function setCachedUser(user: CachedUser): Promise<void> {
+//   try { await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(user)); } 
+//   catch (e) { console.warn('[useOfflineAuth] Error guardando cache:', e); }
+// }
 
-async function clearCachedUser(): Promise<void> {
-  try { await SecureStore.deleteItemAsync(CACHE_KEY); } 
-  catch (e) { console.warn('[useOfflineAuth] Error limpiando cache:', e); }
-}
+// async function clearCachedUser(): Promise<void> {
+//   try { await SecureStore.deleteItemAsync(CACHE_KEY); } 
+//   catch (e) { console.warn('[useOfflineAuth] Error limpiando cache:', e); }
+// }
 
 
 // ---------------------------------------------------------------------------
 // Hook principal
 // ---------------------------------------------------------------------------
 
-export function useOfflineAuth(): UseOfflineAuthReturn {
-  const [user, setUser] = useState<CachedUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+export function useOfflineAuth()  {
+  const session = useSession();
   const { isOnline } = useConnectivity();
 
-  const syncRef = useRef(false);
-  const hydratedRef = useRef(false);
+  // Estado local del usuario (puede venir de cache o del servidor)
+  const [cachedUser, setCachedUser] = useState<CachedUser | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
-  // --- Fase 1: Hidratacion Cache ---
-  useEffect(() => {
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
+  // Ref para saber si alguna vez estuvo autenticado en esta sesión
+  const wasAuthenticatedRef = useRef(false);
 
-    async function hydrate() {
-      const cached = await getCachedUser();
+  // Usuario actual: del servidor si está online, del cache si está offline
+  const serverUser = session.data?.user as CachedUser | null;
+
+  /**
+   * Determina el usuario efectivo basado en el estado de conexión:
+   * - Si hay conexión y el servidor responde, usa datos del servidor
+   * - Si tenemos cache y estuvimos autenticados, mantiene el cache
+   *   (esto cubre tanto offline como durante refetch en reconexión)
+   * - Si nunca estuvo autenticado, no tiene usuario
+   */
+  const effectiveUser = (() => {
+    // Si el servidor tiene datos válidos, priorizar
+    if (serverUser) {
+      return serverUser;
+    }
+
+    // Si tenemos cache y estuvimos autenticados, SIEMPRE mantener el cache
+    // Esto evita flickering durante:
+    // - Modo offline
+    // - Refetch cuando vuelve la conexión
+    // - Cualquier momento donde serverUser sea temporalmente null
+    if (cachedUser && wasAuthenticatedRef.current) {
+      return cachedUser;
+    }
+
+    // Si está cargando la sesión inicial y tenemos cache, mostrar cache
+    if (session.isPending && cachedUser) {
+      return cachedUser;
+    }
+
+    return null;
+  })();
+
+// Guardar usuario en cache local
+  const cacheUser = useCallback(async (user: CachedUser) => {
+    try {
+      const sessionData: CachedSession = {
+        user,
+        cachedAt: Date.now(),
+      };
+      await SecureStore.setItemAsync(CACHED_USER_KEY, JSON.stringify(sessionData));
+      setCachedUser(user);
+      wasAuthenticatedRef.current = true;
+    } catch (error) {
+      console.error('Error caching user:', error);
+    }
+  }, []);
+
+  // Limpiar cache local
+  const clearCache = useCallback(async () => {
+    try {
+      await SecureStore.deleteItemAsync(CACHED_USER_KEY);
+      await SecureStore.deleteItemAsync(CACHED_SESSION_KEY);
+      setCachedUser(null);
+      wasAuthenticatedRef.current = false;
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
+  }, []);
+
+  // Cargar usuario desde cache al iniciar
+  const loadCachedUser = useCallback(async () => {
+    try {
+      const cached = await SecureStore.getItemAsync(CACHED_USER_KEY);
       if (cached) {
-        await ensureLocalTables();
-        const localUser = await getLocalUser(cached.id);
-        if (localUser) setUser(cached);
-        else { await upsertLocalUser(cached); setUser(cached); }
-      }
-      setIsLoading(false);
-      
-      // Intentar sync solo si hay red
-      if (isOnline) syncWithServer(cached);
-    }
-    hydrate();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Solo al montar
+        const sessionData: CachedSession = JSON.parse(cached);
+        setCachedUser(sessionData.user);
+        wasAuthenticatedRef.current = true;
 
-  // --- Sincronización Reactiva ---
-  useEffect(() => {
-    if (isOnline && user && !isSyncing) {
-      syncRef.current = false;
-      syncWithServer(user);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnline]);
-
-  // --- Fase 2: Sync Server ---
-  const syncWithServer = useCallback(async (cachedUser: CachedUser | null) => {
-    if (!isOnline) return; 
-
-    if (syncRef.current) return;
-    syncRef.current = true;
-    setIsSyncing(true);
-
-    try {
-      const sessionResponse = await authClient.getSession();
-      const serverUser = sessionResponse?.data?.user;
-
-      if (serverUser) {
-        const normalizedUser: CachedUser = {
-          id: serverUser.id,
-          name: serverUser.name,
-          email: serverUser.email,
-          image: serverUser.image ?? null,
-          emailVerified: serverUser.emailVerified ?? false,
-        };
-
-        const hasChanged = !cachedUser ||
-          cachedUser.id !== normalizedUser.id ||
-          cachedUser.name !== normalizedUser.name ||
-          cachedUser.email !== normalizedUser.email;
-
-        if (hasChanged) {
-          await setCachedUser(normalizedUser);
-          await ensureLocalTables();
-          await upsertLocalUser(normalizedUser);
-          setUser(normalizedUser);
+        // Verificar si el cache no es muy viejo (30 días max)
+        const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 días en ms
+        if (Date.now() - sessionData.cachedAt > maxAge) {
+          console.warn('Cached session is too old, will need to re-authenticate');
         }
-      } else if (cachedUser) {
-        // Sesión inválida en servidor -> logout local
-        await clearCachedUser();
-        if (cachedUser.id) await clearLocalSessions(cachedUser.id);
-        setUser(null);
       }
-    } catch (e) {
-      console.warn('[useOfflineAuth] Sync falló (modo offline mantenido):', e);
+    } catch (error) {
+      console.error('Error loading cached user:', error);
     } finally {
-      setIsSyncing(false);
-      syncRef.current = false;
+      setIsInitialized(true);
     }
-  }, [isOnline]);
+  }, []);
 
-  // --- Login (MEJORADO) ---
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    setError(null);
+  // Cargar cache al montar
+  useEffect(() => {
+    loadCachedUser();
+  }, [loadCachedUser]);
 
+  // Sincronizar con servidor cuando hay datos nuevos y estamos online
+  useEffect(() => {
+    if (serverUser && isOnline) {
+      cacheUser(serverUser);
+      setSyncError(null);
+    }
+  }, [serverUser, isOnline, cacheUser]);
+
+  // Detectar errores de sincronización cuando está offline
+  useEffect(() => {
+    if (!isOnline && session.error) {
+      setSyncError('No hay conexión a internet. Usando datos locales.');
+    } else if (isOnline) {
+      setSyncError(null);
+    }
+  }, [isOnline, session.error]);
+
+  // Refetch manual solo si hay conexión
+  const refetchSession = useCallback(async () => {
     if (!isOnline) {
-        setError('No hay conexión a internet.');
-        return false;
+      setSyncError('No se puede sincronizar sin conexión a internet.');
+      return;
     }
 
     try {
-      const response = await authClient.signIn.email({ email, password });
-      
-      // ERROR HANDLING MEJORADO
-      if (response.error) {
-        console.error("[Auth] Login Failed:", response.error);
-        
-        // Prioridad: Mensaje del servidor > Texto de estado > Fallback genérico con código
-        const errorMsg = response.error.message || 
-                         response.error.statusText || 
-                         `Error del servidor (${response.error.status})`;
-                         
-        setError(errorMsg);
-        return false;
-      }
-
-      const userData = response.data?.user;
-      if (!userData) { 
-        setError('Error: El servidor no devolvió datos de usuario.'); 
-        return false; 
-      }
-
-      const cachedUser: CachedUser = {
-        id: userData.id, name: userData.name, email: userData.email,
-        image: userData.image ?? null, emailVerified: userData.emailVerified ?? false,
-      };
-
-      await setCachedUser(cachedUser);
-      await ensureLocalTables();
-      await upsertLocalUser(cachedUser);
-      setUser(cachedUser);
-      return true;
-
-    } catch (e) { 
-      console.error("[Auth] Exception during login:", e);
-      setError(e instanceof Error ? e.message : 'Error inesperado al iniciar sesión'); 
-      return false; 
+      await session.refetch();
+      setSyncError(null);
+    } catch {
+      setSyncError('Error al sincronizar sesión.');
     }
-  }, [isOnline]);
+  }, [isOnline, session]);
 
-  // --- Register (MEJORADO) ---
-  const register = useCallback(async (name: string, email: string, password: string): Promise<boolean> => {
-    setError(null);
-
-    if (!isOnline) {
-        setError('No hay conexión a internet.');
-        return false;
-    }
-
-    try {
-      const response = await authClient.signUp.email({ name, email, password });
-      
-      // ERROR HANDLING MEJORADO
-      if (response.error) {
-        console.error("[Auth] Register Failed:", response.error);
-        
-        const errorMsg = response.error.message || 
-                         response.error.statusText || 
-                         `Error del servidor (${response.error.status})`;
-        
-        setError(errorMsg); 
-        return false; 
-      }
-
-      const userData = response.data?.user;
-      if (!userData) { 
-        setError('Error: El servidor no devolvió datos de usuario.'); 
-        return false; 
-      }
-
-      const cachedUser: CachedUser = {
-        id: userData.id, name: userData.name, email: userData.email,
-        image: userData.image ?? null, emailVerified: userData.emailVerified ?? false,
-      };
-
-      await setCachedUser(cachedUser);
-      await ensureLocalTables();
-      await upsertLocalUser(cachedUser);
-      setUser(cachedUser);
-      return true;
-
-    } catch (e) { 
-      console.error("[Auth] Exception during register:", e);
-      setError(e instanceof Error ? e.message : 'Error inesperado al registrarse'); 
-      return false; 
-    }
-  }, [isOnline]);
-
-  // --- Logout ---
-  const logout = useCallback(async () => {
-    setError(null);
-    const currentUser = user;
-
-    try {
-      if (isOnline) await authClient.signOut();
-    } catch (e) { console.warn('Error logout servidor:', e); }
-
-    await clearCachedUser();
-    if (currentUser?.id) await clearLocalSessions(currentUser.id);
-    setUser(null);
-  }, [user, isOnline]);
-
-  const refreshSession = useCallback(async () => {
-    syncRef.current = false;
-    await syncWithServer(user);
-  }, [user, syncWithServer]);
+  // isLoading SOLO es true durante la inicialización del cache local.
+  // Una vez inicializado, NUNCA vuelve a ser true.
+  // Esto evita que el RootNavigator se desmonte durante operaciones de auth
+  // (como registro o login) que podrían causar session.isPending = true temporalmente.
+  const isLoading = !isInitialized;
 
   return {
-    user,
+    // Usuario efectivo (local-first)
+    user: effectiveUser,
+
+    // Estados de carga
     isLoading,
-    isAuthenticated: !!user,
-    isSyncing,
+    isInitialized,
+
+    // Estado de autenticación (local-first)
+    isAuthenticated: !!effectiveUser,
+    wasAuthenticated: wasAuthenticatedRef.current,
+
+    // Estado de conexión y sincronización
     isOnline,
-    error,
-    login,
-    register,
-    logout,
-    refreshSession,
+    isSynced: isOnline && !!serverUser,
+    syncError,
+
+    // Datos del servidor (puede ser null si offline)
+    serverUser,
+    serverSession: session.data,
+
+    // Acciones
+    refetchSession,
+    clearCache,
+    cacheUser,
+
+    // Exponer el session original para casos especiales
+    rawSession: session,
   };
+}
+
+/**
+ * Verifica si el usuario puede realizar una acción que requiere conexión
+ */
+export function useRequiresOnline() {
+  const { isOnline } = useConnectivity();
+
+  const requireOnline = useCallback(
+    (action: string): boolean => {
+      if (!isOnline) {
+        console.warn(`La acción "${action}" requiere conexión a internet.`);
+        return false;
+      }
+      return true;
+    },
+    [isOnline]
+  );
+
+  return { isOnline, requireOnline };
 }

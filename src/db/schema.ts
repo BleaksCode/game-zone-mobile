@@ -64,57 +64,57 @@ export const users = sqliteTable('users', {
     .default(sql`(datetime('now'))`),
 });
 
-export const sessions = sqliteTable('sessions', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  token: text('token').notNull().unique(),
-  expiresAt: text('expires_at').notNull(),
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-  createdAt: text('created_at')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
+// export const sessions = sqliteTable('sessions', {
+//   id: text('id').primaryKey(),
+//   userId: text('user_id')
+//     .notNull()
+//     .references(() => users.id, { onDelete: 'cascade' }),
+//   token: text('token').notNull().unique(),
+//   expiresAt: text('expires_at').notNull(),
+//   ipAddress: text('ip_address'),
+//   userAgent: text('user_agent'),
+//   createdAt: text('created_at')
+//     .notNull()
+//     .default(sql`(datetime('now'))`),
+//   updatedAt: text('updated_at')
+//     .notNull()
+//     .default(sql`(datetime('now'))`),
+// });
 
-export const accounts = sqliteTable('accounts', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  accountId: text('account_id').notNull(),
-  providerId: text('provider_id').notNull(),
-  accessToken: text('access_token'),
-  refreshToken: text('refresh_token'),
-  idToken: text('id_token'),
-  accessTokenExpiresAt: text('access_token_expires_at'),
-  refreshTokenExpiresAt: text('refresh_token_expires_at'),
-  scope: text('scope'),
-  password: text('password'),
-  createdAt: text('created_at')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
+// export const accounts = sqliteTable('accounts', {
+//   id: text('id').primaryKey(),
+//   userId: text('user_id')
+//     .notNull()
+//     .references(() => users.id, { onDelete: 'cascade' }),
+//   accountId: text('account_id').notNull(),
+//   providerId: text('provider_id').notNull(),
+//   accessToken: text('access_token'),
+//   refreshToken: text('refresh_token'),
+//   idToken: text('id_token'),
+//   accessTokenExpiresAt: text('access_token_expires_at'),
+//   refreshTokenExpiresAt: text('refresh_token_expires_at'),
+//   scope: text('scope'),
+//   password: text('password'),
+//   createdAt: text('created_at')
+//     .notNull()
+//     .default(sql`(datetime('now'))`),
+//   updatedAt: text('updated_at')
+//     .notNull()
+//     .default(sql`(datetime('now'))`),
+// });
 
-export const verifications = sqliteTable('verifications', {
-  id: text('id').primaryKey(),
-  identifier: text('identifier').notNull(),
-  value: text('value').notNull(),
-  expiresAt: text('expires_at').notNull(),
-  createdAt: text('created_at')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at')
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
+// export const verifications = sqliteTable('verifications', {
+//   id: text('id').primaryKey(),
+//   identifier: text('identifier').notNull(),
+//   value: text('value').notNull(),
+//   expiresAt: text('expires_at').notNull(),
+//   createdAt: text('created_at')
+//     .notNull()
+//     .default(sql`(datetime('now'))`),
+//   updatedAt: text('updated_at')
+//     .notNull()
+//     .default(sql`(datetime('now'))`),
+// });
 
 // ---------------------------------------------------------------------------
 // Domain Tables — Tournaments
@@ -122,9 +122,7 @@ export const verifications = sqliteTable('verifications', {
 
 export const tournaments = sqliteTable('tournaments', {
   id: text('id').primaryKey(),
-  organizerId: text('organizer_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+  organizerId: text('organizer_id').notNull(),
   name: text('name').notNull(),
   type: text('type').notNull().$type<TournamentTypeValue>(),
   status: text('status')

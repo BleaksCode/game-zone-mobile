@@ -14,7 +14,6 @@ export const auth = betterAuth({
       session: remoteSchema.sessions,
       account: remoteSchema.accounts,
       verification: remoteSchema.verifications,
-      ...remoteSchema
     }
   }),
 
@@ -22,7 +21,6 @@ export const auth = betterAuth({
     "gamezone://",         // mejor sin wildcard
     "http://localhost:8081",
     "http://10.0.2.2:8081",
-    "http://192.168.1.102:8081"
   ],
 
   emailAndPassword: { 

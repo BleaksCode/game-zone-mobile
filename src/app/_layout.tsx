@@ -15,7 +15,7 @@ import { AuthProvider, useAuth } from "@/src/contexts/AuthContext";
 
 // Componentes de Utilidad
 import { OfflineBanner, ReconnectedBanner } from "@/src/components/offline-banner";
-import { SyncManager } from "@/src/components/sync-manager";
+// import { SyncManager } from "@/src/components/sync-manager";
 
 // Componente RootNavigator que decide qué mostrar basado en la autenticación
 function RootNavigator() {
@@ -58,7 +58,7 @@ export default function RootLayout() {
               <DatabaseProvider>
                 <AuthProvider>
                   {/* Componentes lógicos y visuales globales */}
-                  <SyncManager />
+                  {/* <SyncManager /> */}
                   <OfflineBanner />
                   <ReconnectedBanner />
 

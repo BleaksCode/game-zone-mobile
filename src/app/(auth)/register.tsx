@@ -16,6 +16,7 @@ import { Label } from '@/src/components/ui/label';
 
 // Hook Lógica
 import { useOfflineAuth } from '@/src/hooks/useoffline-auth';
+import { useAuth } from '@/src/contexts/AuthContext';
 
 // 1. Esquema de Registro
 const registerSchema = z.object({
@@ -32,9 +33,9 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  
-  const { register, error: authError,  } = useOfflineAuth();
-  
+
+  const { register, isLoading: authLoading, error: authError } = useAuth();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -56,26 +57,31 @@ export default function RegisterScreen() {
   // 3. Submit
   const onSubmit = async (data: RegisterFormData) => {
     Keyboard.dismiss();
+
     setIsSubmitting(true);
     setServerError(null);
 
     try {
-      // Llamada directa a tu hook existente
-      const success = await register(data.name, data.email, data.password);
-      
-      if (success) {
+      // 4. Registrar usuario
+      await register({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+      });
+
+      // Si no hay error desde el auth context:
+      if (!authError) {
         router.replace('/');
       } else {
-        setServerError(authError || 'Error al crear la cuenta');
+        setServerError(authError);
       }
-    } catch (err) {
-      setServerError('Error de conexión o inesperado.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err: any) {
+  // Aquí capturas el mensaje real lanzado por el AuthContext
+  setServerError(err.message || 'Ocurrió un error inesperado.');
+}
   };
 
-  const isFormLoading = isSubmitting;
+  const isFormLoading = authLoading || isSubmitting;
 
   return (
     <KeyboardAwareScrollView

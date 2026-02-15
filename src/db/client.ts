@@ -63,41 +63,7 @@ export async function initLocalDatabase(): Promise<void> {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
 
-      CREATE TABLE IF NOT EXISTS sessions (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        token TEXT NOT NULL UNIQUE,
-        expires_at TEXT NOT NULL,
-        ip_address TEXT,
-        user_agent TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-
-      CREATE TABLE IF NOT EXISTS accounts (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        account_id TEXT NOT NULL,
-        provider_id TEXT NOT NULL,
-        access_token TEXT,
-        refresh_token TEXT,
-        id_token TEXT,
-        access_token_expires_at TEXT,
-        refresh_token_expires_at TEXT,
-        scope TEXT,
-        password TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-
-      CREATE TABLE IF NOT EXISTS verifications (
-        id TEXT PRIMARY KEY,
-        identifier TEXT NOT NULL,
-        value TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
+      
 
       -- Domain tables
       CREATE TABLE IF NOT EXISTS tournaments (
